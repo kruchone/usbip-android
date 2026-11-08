@@ -86,6 +86,20 @@ class UsbIpServerTest {
     }
 
     @Test
+    fun infoExtension() {
+        connect().use { s ->
+            s.getOutputStream().write(UsbIpCodec.encodeReqInfo())
+            val bytes = s.getInputStream().readBytes()
+            val hdr = UsbIpCodec.decodeOpHeader(bytes)
+            assertEquals(UsbIp.OP_REP_INFO, hdr.code)
+            val len = java.nio.ByteBuffer.wrap(bytes, 8, 4).int
+            assertEquals("{\"name\":\"usbip\",\"devices\":[{\"busid\":\"1-1\",\"name\":\"1234:5678\",\"attachedBy\":null}]}",
+                String(bytes, 12, len, Charsets.UTF_8))
+        }
+        assertEquals("{\"name\":\"a\\\"b\",\"devices\":[]}", ServerInfo("a\"b", emptyList()).toJson())
+    }
+
+    @Test
     fun importUnknownBusId() {
         connect().use { s ->
             s.getOutputStream().write(UsbIpCodec.encodeReqImport("9-9"))

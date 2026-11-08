@@ -11,6 +11,13 @@ object UsbIp {
     const val OP_REQ_IMPORT = 0x8003
     const val OP_REP_IMPORT = 0x0003
 
+    /**
+     * Extension (not in Linux usbip): returns a JSON document with the server name, human-readable
+     * device names and which client holds each device. Standard clients never send it.
+     */
+    const val OP_REQ_INFO = 0x8F01
+    const val OP_REP_INFO = 0x0F01
+
     // Operation status codes (usbip_network.h).
     const val ST_OK = 0x00
     const val ST_NA = 0x01

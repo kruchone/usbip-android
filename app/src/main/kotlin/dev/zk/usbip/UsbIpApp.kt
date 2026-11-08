@@ -11,6 +11,8 @@ import android.hardware.usb.UsbManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
+import dev.zk.usbip.protocol.DeviceDetail
+import dev.zk.usbip.protocol.ServerInfo
 import dev.zk.usbip.service.UsbIpService
 import dev.zk.usbip.usb.AndroidUsbBackend
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -116,6 +118,21 @@ class UsbIpApp : Application() {
             )
         }
         _server.update { it.copy(addresses = if (it.running) localAddresses() else emptyList()) }
+    }
+
+    /** Data for the OP_REQ_INFO extension: friendly names and current holders of exported devices. */
+    fun serverInfo(): ServerInfo {
+        val name = runCatching { android.provider.Settings.Global.getString(contentResolver, android.provider.Settings.Global.DEVICE_NAME) }
+            .getOrNull()?.takeIf { it.isNotBlank() } ?: Build.MODEL
+        val details = backend.exportedDevices().map { d ->
+            val busId = backend.busIdOf(d)
+            val title = listOfNotNull(
+                d.manufacturerName?.takeIf { it.isNotBlank() },
+                d.productName?.takeIf { it.isNotBlank() },
+            ).joinToString(" ").ifBlank { AndroidUsbBackend.shareKey(d) }
+            DeviceDetail(busId, title, if (backend.isInUse(d)) attachedClients[busId] ?: "?" else null)
+        }
+        return ServerInfo(name, details)
     }
 
     fun setShared(deviceName: String, shared: Boolean) {

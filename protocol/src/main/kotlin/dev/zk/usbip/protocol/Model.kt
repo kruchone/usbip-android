@@ -77,3 +77,31 @@ interface UsbIpBackend {
     fun listDevices(): List<UsbIpDevice>
     fun import(busId: String): ImportResult
 }
+
+/** Extra, human-oriented details served by the OP_REQ_INFO extension. */
+data class DeviceDetail(val busId: String, val name: String, val attachedBy: String? = null)
+
+data class ServerInfo(val name: String, val devices: List<DeviceDetail>) {
+    fun toJson(): String = buildString {
+        append("{\"name\":").append(jsonString(name)).append(",\"devices\":[")
+        devices.forEachIndexed { i, d ->
+            if (i > 0) append(',')
+            append("{\"busid\":").append(jsonString(d.busId))
+            append(",\"name\":").append(jsonString(d.name))
+            append(",\"attachedBy\":").append(d.attachedBy?.let(::jsonString) ?: "null")
+            append('}')
+        }
+        append("]}")
+    }
+
+    private fun jsonString(s: String) = buildString {
+        append('"')
+        for (c in s) when {
+            c == '"' -> append("\\\"")
+            c == '\\' -> append("\\\\")
+            c < ' ' -> append("\\u%04x".format(c.code))
+            else -> append(c)
+        }
+        append('"')
+    }
+}

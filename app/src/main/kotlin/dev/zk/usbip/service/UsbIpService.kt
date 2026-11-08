@@ -8,7 +8,10 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
+import android.provider.Settings
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
@@ -33,6 +36,7 @@ class UsbIpService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
     private val attachedCount = AtomicInteger(0)
+    private var nsdListener: NsdManager.RegistrationListener? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -76,10 +80,11 @@ class UsbIpService : Service() {
                 if (error != null) Log.w(TAG, message, error) else Log.i(TAG, message)
                 app.log(message)
             }
-        })
+        }, info = { app.serverInfo() })
         try {
             s.start()
             server = s
+            advertise(port)
             app.setServerState(running = true, port = port)
             updateNotification()
         } catch (e: Exception) {
@@ -90,6 +95,7 @@ class UsbIpService : Service() {
     }
 
     override fun onDestroy() {
+        stopAdvertising()
         server?.close()
         server = null
         app.backend.closeAllSessions()
@@ -100,6 +106,35 @@ class UsbIpService : Service() {
         app.log("server stopped")
         super.onDestroy()
     }
+
+    /** Announce the server as "_usbip._tcp" over mDNS/DNS-SD so clients can find it without an IP. */
+    private fun advertise(port: Int) {
+        val nsd = getSystemService(NsdManager::class.java)
+        val info = NsdServiceInfo().apply {
+            serviceName = deviceName()
+            serviceType = SERVICE_TYPE
+            setPort(port)
+            setAttribute("v", "1")
+        }
+        val listener = object : NsdManager.RegistrationListener {
+            override fun onServiceRegistered(info: NsdServiceInfo) { Log.i(TAG, "advertised as '${info.serviceName}'") }
+            override fun onRegistrationFailed(info: NsdServiceInfo, error: Int) { Log.w(TAG, "mDNS registration failed: $error") }
+            override fun onServiceUnregistered(info: NsdServiceInfo) {}
+            override fun onUnregistrationFailed(info: NsdServiceInfo, error: Int) {}
+        }
+        runCatching { nsd.registerService(info, NsdManager.PROTOCOL_DNS_SD, listener) }
+            .onSuccess { nsdListener = listener }
+            .onFailure { Log.w(TAG, "mDNS registration failed", it) }
+    }
+
+    private fun stopAdvertising() {
+        nsdListener?.let { l -> runCatching { getSystemService(NsdManager::class.java).unregisterService(l) } }
+        nsdListener = null
+    }
+
+    private fun deviceName(): String =
+        runCatching { Settings.Global.getString(contentResolver, Settings.Global.DEVICE_NAME) }.getOrNull()
+            ?.takeIf { it.isNotBlank() } ?: Build.MODEL
 
     @Suppress("DEPRECATION")
     private fun acquireLocks() {
@@ -156,6 +191,7 @@ class UsbIpService : Service() {
         private const val CHANNEL_ID = "server"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_STOP = "dev.zk.usbip.STOP"
+        const val SERVICE_TYPE = "_usbip._tcp"
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, UsbIpService::class.java))

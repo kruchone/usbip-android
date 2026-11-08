@@ -39,6 +39,19 @@ object UsbIpCodec {
             putFixedString(it, busId, BUSID_SIZE)
         }.array()
 
+    fun encodeReqInfo(): ByteArray =
+        ByteBuffer.allocate(OP_HEADER_SIZE).also { putOpHeader(it, UsbIp.OP_REQ_INFO, 0) }.array()
+
+    /** OP_REP_INFO: header, u32 length, UTF-8 JSON. */
+    fun encodeInfoReply(json: String): ByteArray {
+        val body = json.toByteArray(Charsets.UTF_8)
+        return ByteBuffer.allocate(OP_HEADER_SIZE + 4 + body.size).also {
+            putOpHeader(it, UsbIp.OP_REP_INFO, UsbIp.ST_OK)
+            it.putInt(body.size)
+            it.put(body)
+        }.array()
+    }
+
     fun encodeDevList(devices: List<UsbIpDevice>): ByteArray {
         val size = OP_HEADER_SIZE + 4 + devices.sumOf { DEVICE_SIZE + INTERFACE_SIZE * it.interfaces.size }
         val bb = ByteBuffer.allocate(size)

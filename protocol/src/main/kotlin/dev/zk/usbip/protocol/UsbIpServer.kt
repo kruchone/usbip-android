@@ -26,6 +26,10 @@ class UsbIpServer(
     private val port: Int = UsbIp.DEFAULT_PORT,
     private val bindAddress: InetAddress? = null,
     private val listener: Listener = object : Listener {},
+    /** Answers the OP_REQ_INFO extension; by default just bus ids without friendly names. */
+    private val info: () -> ServerInfo = {
+        ServerInfo("usbip", backend.listDevices().map { DeviceDetail(it.busId, "%04x:%04x".format(it.vendorId, it.productId)) })
+    },
 ) : Closeable {
 
     interface Listener {
@@ -115,6 +119,10 @@ class UsbIpServer(
                 output.write(UsbIpCodec.encodeDevList(devices))
                 output.flush()
                 listener.log("$who: listed ${devices.size} device(s)")
+            }
+            UsbIp.OP_REQ_INFO -> {
+                output.write(UsbIpCodec.encodeInfoReply(info().toJson()))
+                output.flush()
             }
             UsbIp.OP_REQ_IMPORT -> {
                 val busId = UsbIpCodec.decodeFixedString(ByteArray(UsbIpCodec.BUSID_SIZE).also { input.readFully(it) })
