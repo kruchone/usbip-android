@@ -13,14 +13,27 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "0.1.0-beta.1"
+    }
+
+    // Release key lives outside the repo (see ~/.gradle/gradle.properties: USBIP_KEYSTORE, USBIP_KEYSTORE_PASSWORD,
+    // USBIP_KEY_ALIAS). Without it, release builds fall back to the debug key.
+    val keystore = providers.gradleProperty("USBIP_KEYSTORE").orNull
+    signingConfigs {
+        if (keystore != null) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = providers.gradleProperty("USBIP_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.gradleProperty("USBIP_KEY_ALIAS").getOrElse("usbip")
+                keyPassword = providers.gradleProperty("USBIP_KEYSTORE_PASSWORD").get()
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Signed with the debug key so the release APK can be sideloaded directly.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
