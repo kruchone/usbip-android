@@ -6,6 +6,7 @@ import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbManager
 import android.util.Log
 import dev.zk.usbip.Prefs
+import dev.zk.usbip.protocol.DeviceNaming
 import dev.zk.usbip.protocol.ImportResult
 import dev.zk.usbip.protocol.UsbDescriptors
 import dev.zk.usbip.protocol.UsbIp
@@ -57,6 +58,34 @@ class AndroidUsbBackend(context: Context, private val prefs: Prefs) : UsbIpBacke
         return if (clash) "2-${devNum(d)}" else candidate
     }
 
+    /** Stable identity: VID:PID plus serial number when readable (same key that pins the bus id). */
+    fun identityOf(d: UsbDevice): String = shareKey(d) + (serialOf(d)?.let { ":$it" } ?: "")
+
+    /** Interface classes of the first configuration (alternate setting 0). */
+    fun interfacesOf(d: UsbDevice): List<UsbIpInterface> {
+        val cfg = if (d.configurationCount > 0) d.getConfiguration(0) else null
+        val list = if (cfg != null) (0 until cfg.interfaceCount).map { cfg.getInterface(it) }
+        else (0 until d.interfaceCount).map { d.getInterface(it) }
+        return list.filter { it.alternateSetting == 0 }
+            .map { UsbIpInterface(it.interfaceClass, it.interfaceSubclass, it.interfaceProtocol) }
+    }
+
+    /** Display name: custom label, else product string, else the USB ID database. */
+    fun displayName(d: UsbDevice): String = DeviceNaming.best(
+        d.vendorId, d.productId, prefs.customName(identityOf(d)), manufacturerOf(d), d.productName,
+    )
+
+    fun automaticName(d: UsbDevice): String = DeviceNaming.best(d.vendorId, d.productId, null, manufacturerOf(d), d.productName)
+
+    fun displayDetail(d: UsbDevice): String {
+        val ifaces = interfacesOf(d)
+        val kinds = DeviceNaming.kinds(if (d.deviceClass != 0 && d.deviceClass != 0xEF) listOf(UsbIpInterface(d.deviceClass, d.deviceSubclass, d.deviceProtocol)) + ifaces else ifaces)
+        return DeviceNaming.detail(d.vendorId, d.productId, manufacturerOf(d), kinds, "bus id ${busIdOf(d)}")
+    }
+
+    /** The manufacturer string can need USB permission on some Android versions. */
+    private fun manufacturerOf(d: UsbDevice) = runCatching { d.manufacturerName }.getOrNull()
+
     private fun serialOf(d: UsbDevice) =
         if (usb.hasPermission(d)) runCatching { d.serialNumber }.getOrNull()?.takeIf { it.isNotBlank() } else null
 
@@ -101,13 +130,7 @@ class AndroidUsbBackend(context: Context, private val prefs: Prefs) : UsbIpBacke
         val (busNum, devNum) = busDev(d)
         val f = facts[d.deviceName] ?: readFacts(d, existing, busNum, devNum).also { facts[d.deviceName] = it }
         val cfg = if (d.configurationCount > 0) d.getConfiguration(0) else null
-        val ifaces = if (cfg != null) {
-            (0 until cfg.interfaceCount).map { cfg.getInterface(it) }.filter { it.alternateSetting == 0 }
-                .map { UsbIpInterface(it.interfaceClass, it.interfaceSubclass, it.interfaceProtocol) }
-        } else {
-            (0 until d.interfaceCount).map { d.getInterface(it) }.filter { it.alternateSetting == 0 }
-                .map { UsbIpInterface(it.interfaceClass, it.interfaceSubclass, it.interfaceProtocol) }
-        }
+        val ifaces = interfacesOf(d)
         return UsbIpDevice(
             path = d.deviceName,
             busId = busIdOf(d),

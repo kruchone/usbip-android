@@ -32,6 +32,7 @@ data class DeviceUi(
     val busId: String,
     val title: String,
     val subtitle: String,
+    val automaticName: String = title,
     val shared: Boolean,
     val hasPermission: Boolean,
     val attachedBy: String?,
@@ -104,16 +105,13 @@ class UsbIpApp : Application() {
         _devices.value = backend.allDevices().map { d ->
             val perm = backend.hasPermission(d)
             val busId = backend.busIdOf(d)
-            val name = listOfNotNull(
-                d.manufacturerName?.takeIf { perm && it.isNotBlank() },
-                d.productName?.takeIf { it.isNotBlank() },
-            ).joinToString(" ").ifBlank { "USB device" }
             DeviceUi(
                 deviceName = d.deviceName,
                 shareKey = AndroidUsbBackend.shareKey(d),
                 busId = busId,
-                title = name,
-                subtitle = "${AndroidUsbBackend.shareKey(d)} · bus id $busId",
+                title = backend.displayName(d),
+                subtitle = backend.displayDetail(d),
+                automaticName = backend.automaticName(d),
                 shared = backend.isShared(d),
                 hasPermission = perm,
                 attachedBy = if (backend.isInUse(d)) attachedClients[busId] ?: "a client" else null,
@@ -133,13 +131,16 @@ class UsbIpApp : Application() {
             .getOrNull()?.takeIf { it.isNotBlank() } ?: Build.MODEL
         val details = backend.exportedDevices().map { d ->
             val busId = backend.busIdOf(d)
-            val title = listOfNotNull(
-                d.manufacturerName?.takeIf { it.isNotBlank() },
-                d.productName?.takeIf { it.isNotBlank() },
-            ).joinToString(" ").ifBlank { AndroidUsbBackend.shareKey(d) }
-            DeviceDetail(busId, title, if (backend.isInUse(d)) attachedClients[busId] ?: "?" else null)
+            DeviceDetail(busId, backend.displayName(d), if (backend.isInUse(d)) attachedClients[busId] ?: "?" else null)
         }
         return ServerInfo(name, details)
+    }
+
+    /** Sets a custom label (blank = automatic name). Clients see it through the info extension. */
+    fun rename(deviceName: String, name: String) {
+        val d = backend.allDevices().firstOrNull { it.deviceName == deviceName } ?: return
+        prefs.setCustomName(backend.identityOf(d), name.takeIf { it.isNotBlank() && it.trim() != backend.automaticName(d) })
+        refreshDevices()
     }
 
     fun setShared(deviceName: String, shared: Boolean) {

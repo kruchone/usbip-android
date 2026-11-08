@@ -24,6 +24,15 @@ class Prefs(context: Context) {
     fun allowedClientSet(): Set<String> =
         allowedClients.split(',', ' ', ';').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
+    /** User-chosen label for a device identity (see AndroidUsbBackend.identityOf), or null. */
+    fun customName(identity: String): String? = sp.getString("name:$identity", null)
+
+    fun setCustomName(identity: String, name: String?) {
+        val e = sp.edit()
+        if (name.isNullOrBlank()) e.remove("name:$identity") else e.putString("name:$identity", name.trim())
+        e.apply()
+    }
+
     /** Devices are shared by "vvvv:pppp" so the choice survives re-plugging. */
     fun isShared(key: String) = key in sp.getStringSet("shared", emptySet())!!
 

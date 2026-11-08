@@ -7,8 +7,17 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,6 +32,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -101,59 +111,114 @@ private fun AppTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = scheme, content = content)
 }
 
+private enum class Screen { Main, Settings, Activity }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainScreen(app: UsbIpApp) {
-    val server by app.server.collectAsStateWithLifecycle()
-    val devices by app.devices.collectAsStateWithLifecycle()
-    val log by app.log.collectAsStateWithLifecycle()
-    val ctx = LocalContext.current
-    val hasUsbHost = remember { ctx.packageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST) }
+    var screen by rememberSaveable { mutableStateOf(Screen.Main) }
+    BackHandler(enabled = screen != Screen.Main) { screen = Screen.Main }
 
-    Scaffold(topBar = { CenterAlignedTopAppBar(title = { Text("USB/IP Server") }) }) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item {
-                ServerCard(server, onToggle = { on -> if (on) UsbIpService.start(ctx) else UsbIpService.stop(ctx) })
-            }
-            if (!hasUsbHost) {
-                item { Notice("This device doesn't report USB host (OTG) support, so USB devices may not be detected.") }
-            }
-            item { SectionTitle("USB devices") }
-            if (devices.isEmpty()) {
-                item { Notice("No USB devices. Plug one in with a USB OTG adapter or a powered OTG hub.") }
-            }
-            items(devices, key = { it.deviceName }) { d ->
-                DeviceCard(
-                    d, server,
-                    onShare = { app.setShared(d.deviceName, it) },
-                    onGrant = { app.requestPermission(d.deviceName) },
-                )
-            }
-            item { SectionTitle("Settings") }
-            item { SettingsCard(app, server.running) }
-            item {
-                Notice(
-                    "USB/IP has no authentication or encryption. Anyone who can reach this phone on the " +
-                        "network can attach shared devices, so use a trusted network or set allowed client IPs.",
-                )
-            }
-            if (log.isNotEmpty()) {
-                item { SectionTitle("Activity") }
-                item {
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(12.dp)) {
-                            log.take(40).forEach {
-                                Text(it, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
-                            }
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        when (screen) {
+                            Screen.Main -> "USB/IP Server"
+                            Screen.Settings -> "Settings"
+                            Screen.Activity -> "Activity"
+                        },
+                    )
+                },
+                navigationIcon = {
+                    if (screen != Screen.Main) {
+                        IconButton(onClick = { screen = Screen.Main }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     }
-                }
-            }
+                },
+                actions = {
+                    if (screen == Screen.Main) {
+                        IconButton(onClick = { screen = Screen.Activity }) {
+                            Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Activity")
+                        }
+                        IconButton(onClick = { screen = Screen.Settings }) {
+                            Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                        }
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        val modifier = Modifier.fillMaxSize().padding(padding)
+        when (screen) {
+            Screen.Main -> DevicesScreen(app, modifier)
+            Screen.Settings -> SettingsScreen(app, modifier)
+            Screen.Activity -> ActivityScreen(app, modifier)
         }
+    }
+}
+
+@Composable
+private fun DevicesScreen(app: UsbIpApp, modifier: Modifier) {
+    val server by app.server.collectAsStateWithLifecycle()
+    val devices by app.devices.collectAsStateWithLifecycle()
+    val ctx = LocalContext.current
+    val hasUsbHost = remember { ctx.packageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST) }
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            ServerCard(server, onToggle = { on -> if (on) UsbIpService.start(ctx) else UsbIpService.stop(ctx) })
+        }
+        if (!hasUsbHost) {
+            item { Notice("This device doesn't report USB host (OTG) support, so USB devices may not be detected.") }
+        }
+        item { SectionTitle("USB devices") }
+        if (devices.isEmpty()) {
+            item { Notice("No USB devices. Plug one in with a USB OTG adapter or a powered OTG hub.") }
+        }
+        items(devices, key = { it.deviceName }) { d ->
+            DeviceCard(
+                d, server,
+                onShare = { app.setShared(d.deviceName, it) },
+                onGrant = { app.requestPermission(d.deviceName) },
+                onRename = { app.rename(d.deviceName, it) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsScreen(app: UsbIpApp, modifier: Modifier) {
+    val server by app.server.collectAsStateWithLifecycle()
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item { SettingsCard(app, server.running) }
+        item {
+            Notice(
+                "USB/IP has no authentication or encryption. Anyone who can reach this phone on the " +
+                    "network can attach shared devices, so use a trusted network or set allowed client IPs.",
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActivityScreen(app: UsbIpApp, modifier: Modifier) {
+    val log by app.log.collectAsStateWithLifecycle()
+    if (log.isEmpty()) {
+        Column(modifier.padding(16.dp)) { Notice("Nothing yet. Connections, attaches and plugged-in devices show up here.") }
+        return
+    }
+    LazyColumn(modifier = modifier, contentPadding = PaddingValues(16.dp)) {
+        items(log) { line -> Text(line, fontFamily = FontFamily.Monospace, fontSize = 12.sp, modifier = Modifier.padding(vertical = 2.dp)) }
     }
 }
 
@@ -209,14 +274,24 @@ private fun ServerCard(server: ServerUi, onToggle: (Boolean) -> Unit) {
 }
 
 @Composable
-private fun DeviceCard(d: DeviceUi, server: ServerUi, onShare: (Boolean) -> Unit, onGrant: () -> Unit) {
+private fun DeviceCard(d: DeviceUi, server: ServerUi, onShare: (Boolean) -> Unit, onGrant: () -> Unit, onRename: (String) -> Unit) {
     val clipboard = LocalClipboardManager.current
+    var renaming by remember { mutableStateOf(false) }
+    if (renaming) {
+        RenameDialog(
+            current = d.title,
+            automatic = d.automaticName,
+            onDismiss = { renaming = false },
+            onSave = { renaming = false; onRename(it) },
+        )
+    }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).clickable { renaming = true }) {
                     Text(d.title, style = MaterialTheme.typography.titleMedium)
-                    Text(d.subtitle, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                    Text(d.subtitle, style = MaterialTheme.typography.bodySmall)
+                    Text("Tap to rename", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                 }
                 if (d.notShareableReason == null) {
                     Text("Share", style = MaterialTheme.typography.labelMedium)
@@ -293,4 +368,29 @@ private fun SettingsCard(app: UsbIpApp, running: Boolean) {
             }
         }
     }
+}
+
+@Composable
+private fun RenameDialog(current: String, automatic: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var text by remember { mutableStateOf(if (current == automatic) "" else current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename device") },
+        text = {
+            Column {
+                Text("Give it a name you'll recognize. Computers that attach it see this name too.", style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.padding(4.dp))
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    singleLine = true,
+                    placeholder = { Text(automatic) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text("Leave empty to use: $automatic", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(text) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }

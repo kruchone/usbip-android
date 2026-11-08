@@ -36,6 +36,19 @@ Besides standard USB/IP, the Android server answers op `0x8F01` (OP_REQ_INFO) wi
 `0x0F01` + u32 length + JSON: `{"name", "devices":[{"busid","name","attachedBy"}]}`. Standard clients never
 send it. usbip-windows uses it for friendly names and "in use by" status.
 
+## Device names
+
+Devices are named from, in order:
+1. your own label (tap a device's name → Rename);
+2. the device's USB product string;
+3. the bundled [USB ID database](http://www.linux-usb.org/usb.ids) (`protocol/src/main/resources/usb.ids.gz`,
+   GPL-2.0-or-later / BSD-3-Clause), looked up by VID:PID.
+
+Generic strings like "USB Receiver" get the vendor added ("Logitech Unifying Receiver"). The second line shows the vendor,
+what the device contains (Keyboard, Mouse, Audio, Storage, …) and its VID:PID and bus id. Labels are sent to clients through the
+info extension, so a name set on the phone also shows up in usbip-windows. The naming logic (`DeviceNaming`) matches
+usbip-windows' `DeviceNames`.
+
 ## Security
 
 USB/IP has no authentication or encryption. Only run it on a trusted network, or set
