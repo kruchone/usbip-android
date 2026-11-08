@@ -1,5 +1,7 @@
 # USB/IP Server for Android
 
+**Download:** https://kruchone.github.io/usbip/
+
 Share USB devices plugged into an Android phone or tablet with a Windows (or Linux) PC over the network,
 the way VirtualHere does. The app is a standard **USB/IP** server (TCP 3240, protocol 1.1.1), so the
 Windows side uses the companion tray app [usbip-windows](https://github.com/kruchone/usbip-windows), which runs on the signed **usbip-win2** driver. Any standard USB/IP client also works.
