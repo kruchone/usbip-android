@@ -2,10 +2,10 @@
 
 Share USB devices plugged into an Android phone or tablet with a Windows (or Linux) PC over the network,
 the way VirtualHere does. The app is a standard **USB/IP** server (TCP 3240, protocol 1.1.1), so the
-Windows side uses the existing signed **usbip-win2** client; no custom PC software is needed.
+Windows side uses the companion tray app [usbip-windows](https://github.com/kruchone/usbip-windows), which runs on the signed **usbip-win2** driver. Any standard USB/IP client also works.
 
 ```
-[USB device] --OTG--> [Android phone: this app] ==Wi-Fi/TCP 3240==> [Windows: usbip-win2] -> device appears locally
+[USB device] --OTG--> [Android phone: this app] ==Wi-Fi/TCP 3240==> [Windows: usbip-windows + usbip-win2] -> device appears locally
 ```
 
 Supported: control, bulk and interrupt transfers. That covers USB-serial adapters, Arduino/ESP/MCU
