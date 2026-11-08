@@ -24,19 +24,33 @@ can't do them.
 The server keeps running in the background as a foreground service, with a notification that has a Stop button.
 While a device is attached it holds wake and Wi-Fi locks so transfers continue with the screen off.
 
-## Windows setup
+## Windows app (`windows/UsbIpClient`)
 
-1. Install **usbip-win2**: https://github.com/vadimgrn/usbip-win2/releases (run its signed installer).
-2. From an elevated terminal:
-   ```
-   usbip list -r 192.168.1.50                # devices the phone exports
-   usbip attach -r 192.168.1.50 -b 1-1       # attach one; it shows up in Device Manager
-   usbip port                                # attached devices
-   usbip detach -p 1                         # detach
-   ```
-   usbip-win2 also has a GUI and can re-attach devices automatically after reconnects.
+USB/IP Client is a WPF tray app (.NET 10) that works on top of the signed **usbip-win2** driver.
+Install the driver once with `winget install vadimgrn.usbip-win2`. What the app does:
 
-Bus IDs (`1-1`, `1-2`, …) stay the same for a given device across re-plugs, so saved attachments keep working.
+- **Finds phones:** it discovers phones running the server over mDNS (`_usbip._tcp`). You can also add a server
+  by address, e.g. over Tailscale.
+- **Shows devices:** each shared device is listed with its real name, VID:PID, bus speed, and whether it's free or in use by another PC.
+- **Attaches:** one click attaches or detaches a device. An **Auto** checkbox re-attaches it whenever it becomes available,
+  backing off after failures. You get tray notifications when devices attach or disconnect.
+- **Runs in the background:** closing the window keeps it in the notification area, and it can **start with Windows**.
+- **No admin rights:** the driver lets any user attach devices, so the app never asks for elevation.
+
+To build on Windows:
+
+```
+cd windows\UsbIpClient
+dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o %LOCALAPPDATA%\Programs\UsbIpClient
+```
+
+Advanced users can drive usbip-win2 directly with `usbip list -r <ip>`, `usbip attach -r <ip> -b 1-1`, and `usbip port`.
+
+### Protocol extension
+
+Besides standard USB/IP, the Android server answers op `0x8F01` (OP_REQ_INFO) with
+`0x0F01` + u32 length + JSON: `{"name", "devices":[{"busid","name","attachedBy"}]}`. Standard clients never
+send it. The Windows app uses it for friendly names and "in use by" status.
 
 ## Security
 
