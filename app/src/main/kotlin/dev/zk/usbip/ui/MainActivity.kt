@@ -218,11 +218,18 @@ private fun DeviceCard(d: DeviceUi, server: ServerUi, onShare: (Boolean) -> Unit
                     Text(d.title, style = MaterialTheme.typography.titleMedium)
                     Text(d.subtitle, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
                 }
-                Text("Share", style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.width(8.dp))
-                Switch(checked = d.shared, onCheckedChange = onShare)
+                if (d.notShareableReason == null) {
+                    Text("Share", style = MaterialTheme.typography.labelMedium)
+                    Spacer(Modifier.width(8.dp))
+                    Switch(checked = d.shared, onCheckedChange = onShare)
+                }
             }
             when {
+                d.notShareableReason != null -> Text(
+                    d.notShareableReason,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
                 d.shared && !d.hasPermission -> Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Needs USB permission", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
                     TextButton(onClick = onGrant) { Text("Grant") }

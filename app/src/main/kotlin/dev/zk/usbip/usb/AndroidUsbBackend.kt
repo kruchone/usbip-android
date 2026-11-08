@@ -38,7 +38,14 @@ class AndroidUsbBackend(context: Context, private val prefs: Prefs) : UsbIpBacke
 
     fun isInUse(d: UsbDevice) = sessions.containsKey(d.deviceName)
 
-    fun exportedDevices(): List<UsbDevice> = allDevices().filter { isShared(it) && usb.hasPermission(it) }
+    fun exportedDevices(): List<UsbDevice> =
+        allDevices().filter { isShareable(it) && isShared(it) && usb.hasPermission(it) }
+
+    /**
+     * Hubs can't be passed through (taking one over would disconnect everything behind it), and
+     * Billboard devices (e.g. the descriptor-only function of USB-C adapters) have nothing to use.
+     */
+    fun isShareable(d: UsbDevice) = d.deviceClass != USB_CLASS_HUB && d.deviceClass != USB_CLASS_BILLBOARD
 
     /** Stable bus id "1-N" derived from the device's identity (VID:PID plus serial number when readable). */
     fun busIdOf(d: UsbDevice): String {
@@ -149,6 +156,8 @@ class AndroidUsbBackend(context: Context, private val prefs: Prefs) : UsbIpBacke
 
     companion object {
         private const val TAG = "UsbIp"
+        const val USB_CLASS_HUB = 0x09
+        const val USB_CLASS_BILLBOARD = 0x11
 
         fun shareKey(d: UsbDevice) = "%04x:%04x".format(d.vendorId, d.productId)
 

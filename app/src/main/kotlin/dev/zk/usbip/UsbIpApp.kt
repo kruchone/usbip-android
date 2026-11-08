@@ -35,6 +35,8 @@ data class DeviceUi(
     val shared: Boolean,
     val hasPermission: Boolean,
     val attachedBy: String?,
+    /** Null if the device can be shared, otherwise why not. */
+    val notShareableReason: String? = null,
 )
 
 data class ServerUi(
@@ -115,6 +117,11 @@ class UsbIpApp : Application() {
                 shared = backend.isShared(d),
                 hasPermission = perm,
                 attachedBy = if (backend.isInUse(d)) attachedClients[busId] ?: "a client" else null,
+                notShareableReason = when (d.deviceClass) {
+                    AndroidUsbBackend.USB_CLASS_HUB -> "USB hubs can't be shared. Share the devices plugged into it instead."
+                    AndroidUsbBackend.USB_CLASS_BILLBOARD -> "This is an information-only function of a USB-C adapter; there's nothing to share."
+                    else -> null
+                },
             )
         }
         _server.update { it.copy(addresses = if (it.running) localAddresses() else emptyList()) }

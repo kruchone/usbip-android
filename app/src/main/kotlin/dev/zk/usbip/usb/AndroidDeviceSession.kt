@@ -45,6 +45,9 @@ class AndroidDeviceSession(
     private data class EpRef(val interfaceId: Int, val endpoint: UsbEndpoint)
 
     private val tag = "UsbIp/${info.busId}"
+
+    /** Per-URB tracing: adb shell setprop log.tag.UsbIpUrb VERBOSE (then restart the server). */
+    private val trace = Log.isLoggable(TRACE_TAG, Log.VERBOSE)
     private val lock = Any()
     @Volatile private var closed = false
     @Volatile private var disconnectCallback: (() -> Unit)? = null
@@ -63,6 +66,7 @@ class AndroidDeviceSession(
     init {
         config = activeConfiguration()
         claimConfiguration(config)
+        DeviceQuirks.afterClaim(device, conn, config, tag)
         reaper.start()
     }
 
@@ -73,7 +77,16 @@ class AndroidDeviceSession(
         if (closed) callback()
     }
 
-    override fun submit(request: SubmitRequest, onComplete: (UrbResult) -> Unit): UrbHandle {
+    override fun submit(request: SubmitRequest, onComplete0: (UrbResult) -> Unit): UrbHandle {
+        val onComplete: (UrbResult) -> Unit = if (!trace) onComplete0 else { r ->
+            val data = r.data?.takeIf { request.isIn }?.copyOf(minOf(r.actualLength, 16))?.joinToString(" ") { "%02x".format(it) } ?: ""
+            Log.v(TRACE_TAG, "done  #${request.seqnum} ep${request.endpoint}${if (request.isIn) "in" else "out"} status=${r.status} actual=${r.actualLength} $data")
+            onComplete0(r)
+        }
+        if (trace) {
+            val setup = if (request.endpoint == 0) " setup=" + request.setup.joinToString("") { "%02x".format(it) } else ""
+            Log.v(TRACE_TAG, "submit #${request.seqnum} ep${request.endpoint}${if (request.isIn) "in" else "out"} len=${request.transferBufferLength} flags=0x${request.transferFlags.toString(16)}$setup")
+        }
         if (closed) {
             onComplete(UrbResult.error(Errno.ENODEV))
             return NO_CANCEL
@@ -246,6 +259,7 @@ class AndroidDeviceSession(
 
         override fun cancel() = synchronized(this) {
             if (finished) return
+            if (trace) Log.v(TRACE_TAG, "cancel #${req.seqnum}")
             cancelled = true
             val r = current
             if (r == null || !r.cancel()) finish(-Errno.ECONNRESET)
@@ -334,6 +348,7 @@ class AndroidDeviceSession(
     }
 
     private companion object {
+        const val TRACE_TAG = "UsbIpUrb"
         val NO_CANCEL = UrbHandle {}
         const val REQ_CLEAR_FEATURE = 0x01
         const val REQ_SET_FEATURE = 0x03
