@@ -199,7 +199,14 @@ public sealed class AppController : Observable
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
             list = await UsbIpWire.ListAsync(s.Host, s.Port, cts.Token);
-            info = await UsbIpWire.InfoAsync(s.Host, s.Port, cts.Token);
+            info = null;
+            if (DateTime.Now >= s.InfoRetryAt)
+            {
+                info = await UsbIpWire.InfoAsync(s.Host, s.Port, cts.Token);
+                // Servers without the extension (older app versions, Linux usbipd) log every unknown
+                // request, so only re-check occasionally.
+                if (info == null) s.InfoRetryAt = DateTime.Now + TimeSpan.FromMinutes(10);
+            }
         }
         catch (Exception e)
         {

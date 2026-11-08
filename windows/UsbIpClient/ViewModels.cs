@@ -62,6 +62,9 @@ public sealed class ServerVm : Observable
     public IReadOnlyList<string> Addresses { get; set; } = Array.Empty<string>();
     public DateTime LastSeen { get; set; } = DateTime.Now;
 
+    /** When a server doesn't implement the info extension, don't ask again until this time. */
+    public DateTime InfoRetryAt { get; set; } = DateTime.MinValue;
+
     public string Name { get => _name; set => Set(ref _name, value); }
 
     /** Address used to talk to the server (and recorded by the driver for attached devices). */
