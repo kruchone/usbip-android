@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Match every USB device so Android offers "Always open USB/IP Server" on plug-in,
+         which grants persistent permission for that device. -->
+    <usb-device />
+</resources>

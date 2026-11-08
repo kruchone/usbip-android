@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- plug prongs -->
+    <path android:fillColor="#FFFFFF" android:pathData="M45,32h5v14h-5z M58,32h5v14h-5z" />
+    <!-- plug body -->
+    <path android:fillColor="#FFFFFF" android:pathData="M38,46h32v14a10,10 0 0,1 -10,10h-12a10,10 0 0,1 -10,-10z" />
+    <!-- cable -->
+    <path android:fillColor="#FFFFFF" android:pathData="M51,70h6v8h-6z" />
+</vector>
