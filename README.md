@@ -24,33 +24,17 @@ can't do them.
 The server keeps running in the background as a foreground service, with a notification that has a Stop button.
 While a device is attached it holds wake and Wi-Fi locks so transfers continue with the screen off.
 
-## Windows app (`windows/UsbIpClient`)
+## Windows
 
-USB/IP Client is a WPF tray app (.NET 10) that works on top of the signed **usbip-win2** driver.
-Install the driver once with `winget install vadimgrn.usbip-win2`. What the app does:
-
-- **Finds phones:** it discovers phones running the server over mDNS (`_usbip._tcp`). You can also add a server
-  by address, e.g. over Tailscale.
-- **Shows devices:** each shared device is listed with its real name, VID:PID, bus speed, and whether it's free or in use by another PC.
-- **Attaches:** one click attaches or detaches a device. An **Auto** checkbox re-attaches it whenever it becomes available,
-  backing off after failures. You get tray notifications when devices attach or disconnect.
-- **Runs in the background:** closing the window keeps it in the notification area, and it can **start with Windows**.
-- **No admin rights:** the driver lets any user attach devices, so the app never asks for elevation.
-
-To build on Windows:
-
-```
-cd windows\UsbIpClient
-dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o %LOCALAPPDATA%\Programs\UsbIpClient
-```
-
-Advanced users can drive usbip-win2 directly with `usbip list -r <ip>`, `usbip attach -r <ip> -b 1-1`, and `usbip port`.
+Use [usbip-windows](https://github.com/kruchone/usbip-windows), a tray app that discovers this server, shows
+device names and attaches devices with one click. Any standard USB/IP client works too, e.g. `usbip attach -r <ip> -b 1-1`
+with usbip-win2.
 
 ### Protocol extension
 
 Besides standard USB/IP, the Android server answers op `0x8F01` (OP_REQ_INFO) with
 `0x0F01` + u32 length + JSON: `{"name", "devices":[{"busid","name","attachedBy"}]}`. Standard clients never
-send it. The Windows app uses it for friendly names and "in use by" status.
+send it. usbip-windows uses it for friendly names and "in use by" status.
 
 ## Security
 
