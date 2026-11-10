@@ -21,9 +21,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.net.Inet4Address
 import java.net.NetworkInterface
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 data class DeviceUi(
@@ -59,8 +56,8 @@ class UsbIpApp : Application() {
     private val _server = MutableStateFlow(ServerUi())
     val server: StateFlow<ServerUi> = _server.asStateFlow()
 
-    private val _log = MutableStateFlow<List<String>>(emptyList())
-    val log: StateFlow<List<String>> = _log.asStateFlow()
+    /** Recent log lines, newest first (also written to files; see AppLog). */
+    val log: StateFlow<List<String>> get() = AppLog.recent
 
     /** busId -> client IP currently attached. */
     val attachedClients = ConcurrentHashMap<String, String>()
@@ -89,6 +86,7 @@ class UsbIpApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        AppLog.init(this)
         prefs = Prefs(this)
         backend = AndroidUsbBackend(this, prefs)
         backend.onSessionsChanged = { refreshDevices() }
@@ -172,9 +170,8 @@ class UsbIpApp : Application() {
         refreshDevices()
     }
 
-    fun log(message: String) {
-        val line = "${SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())}  $message"
-        _log.update { (listOf(line) + it).take(200) }
+    fun log(message: String, error: Throwable? = null) {
+        if (error != null) AppLog.w("UsbIp", message, error) else AppLog.i("UsbIp", message)
     }
 
     companion object {

@@ -1,5 +1,6 @@
 package dev.zk.usbip.service
 
+import dev.zk.usbip.AppLog
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -15,7 +16,6 @@ import android.provider.Settings
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -77,8 +77,7 @@ class UsbIpService : Service() {
             }
 
             override fun log(message: String, error: Throwable?) {
-                if (error != null) Log.w(TAG, message, error) else Log.i(TAG, message)
-                app.log(message)
+                app.log(message, error)
             }
         }, info = { app.serverInfo() })
         try {
@@ -88,7 +87,7 @@ class UsbIpService : Service() {
             app.setServerState(running = true, port = port)
             updateNotification()
         } catch (e: Exception) {
-            Log.e(TAG, "could not start server", e)
+            AppLog.e(TAG, "could not start server", e)
             app.setServerState(running = false, port = port, error = "Could not listen on port $port: ${e.message}")
             stopSelf()
         }
@@ -117,14 +116,14 @@ class UsbIpService : Service() {
             setAttribute("v", "1")
         }
         val listener = object : NsdManager.RegistrationListener {
-            override fun onServiceRegistered(info: NsdServiceInfo) { Log.i(TAG, "advertised as '${info.serviceName}'") }
-            override fun onRegistrationFailed(info: NsdServiceInfo, error: Int) { Log.w(TAG, "mDNS registration failed: $error") }
+            override fun onServiceRegistered(info: NsdServiceInfo) { AppLog.i(TAG, "advertised as '${info.serviceName}'") }
+            override fun onRegistrationFailed(info: NsdServiceInfo, error: Int) { AppLog.w(TAG, "mDNS registration failed: $error") }
             override fun onServiceUnregistered(info: NsdServiceInfo) {}
             override fun onUnregistrationFailed(info: NsdServiceInfo, error: Int) {}
         }
         runCatching { nsd.registerService(info, NsdManager.PROTOCOL_DNS_SD, listener) }
             .onSuccess { nsdListener = listener }
-            .onFailure { Log.w(TAG, "mDNS registration failed", it) }
+            .onFailure { AppLog.w(TAG, "mDNS registration failed", it) }
     }
 
     private fun stopAdvertising() {

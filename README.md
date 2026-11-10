@@ -51,6 +51,14 @@ what the device contains (Keyboard, Mouse, Audio, Storage, …) and its VID:PID 
 info extension, so a name set on the phone also shows up in usbip-windows. The naming logic (`DeviceNaming`) matches
 usbip-windows' `DeviceNames`.
 
+## Logs
+
+The Activity screen (list icon) shows recent events, warnings and errors. They are also written to
+files on the phone and kept for 7 days. Use **Share** (top right of the Activity screen) to send the
+full log, including error details, by email, chat, Drive and so on. **Clear** deletes it. With adb you
+can also run `adb logcat -s UsbIp`. Per-transfer tracing (logcat only) is turned on with
+`adb shell setprop log.tag.UsbIpUrb VERBOSE`.
+
 ## Security
 
 USB/IP has no authentication or encryption. Only run it on a trusted network, or set

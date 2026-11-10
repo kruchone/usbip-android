@@ -1,7 +1,13 @@
 package dev.zk.usbip.ui
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
+import android.widget.Toast
+import androidx.core.content.FileProvider
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
+import dev.zk.usbip.AppLog
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -139,6 +145,15 @@ private fun MainScreen(app: UsbIpApp) {
                     }
                 },
                 actions = {
+                    if (screen == Screen.Activity) {
+                        val ctx = LocalContext.current
+                        IconButton(onClick = { shareLogs(ctx) }) {
+                            Icon(Icons.Filled.Share, contentDescription = "Share log")
+                        }
+                        IconButton(onClick = { AppLog.clear() }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Clear log")
+                        }
+                    }
                     if (screen == Screen.Main) {
                         IconButton(onClick = { screen = Screen.Activity }) {
                             Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Activity")
@@ -214,12 +229,49 @@ private fun SettingsScreen(app: UsbIpApp, modifier: Modifier) {
 private fun ActivityScreen(app: UsbIpApp, modifier: Modifier) {
     val log by app.log.collectAsStateWithLifecycle()
     if (log.isEmpty()) {
-        Column(modifier.padding(16.dp)) { Notice("Nothing yet. Connections, attaches and plugged-in devices show up here.") }
+        Column(modifier.padding(16.dp)) { Notice("Nothing yet. Connections, attaches, errors and plugged-in devices show up here.") }
         return
     }
     LazyColumn(modifier = modifier, contentPadding = PaddingValues(16.dp)) {
-        items(log) { line -> Text(line, fontFamily = FontFamily.Monospace, fontSize = 12.sp, modifier = Modifier.padding(vertical = 2.dp)) }
+        item {
+            Text(
+                "Kept on this phone for 7 days. Use Share to send the full log (with error details) to someone.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+        items(log) { line ->
+            val level = line.getOrNull(15)
+            Text(
+                line,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+                color = when (level) {
+                    'E' -> MaterialTheme.colorScheme.error
+                    'W' -> MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
+                modifier = Modifier.padding(vertical = 2.dp),
+            )
+        }
     }
+}
+
+/** Exports the kept log files into one text file and opens the share sheet (email, chat, Drive...). */
+private fun shareLogs(ctx: Context) {
+    val file = runCatching { AppLog.exportForSharing(ctx) }.getOrElse {
+        Toast.makeText(ctx, "Could not export the log: ${it.message}", Toast.LENGTH_LONG).show()
+        return
+    }
+    val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.logs", file)
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        putExtra(Intent.EXTRA_SUBJECT, "USB/IP Server log")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    ctx.startActivity(Intent.createChooser(send, "Share log"))
 }
 
 @Composable

@@ -1,10 +1,10 @@
 package dev.zk.usbip.usb
 
+import dev.zk.usbip.AppLog
 import android.hardware.usb.UsbConfiguration
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
-import android.util.Log
 
 /**
  * Fix-ups for devices that Android's own kernel drivers leave in a non-default state. A device was
@@ -46,6 +46,6 @@ object DeviceQuirks {
         }
         // SET_REPORT(Output, id 0x20) on the HID++ interface.
         val n = conn.controlTransfer(0x21, 0x09, (0x02 shl 8) or 0x20, hidpp.id, report, report.size, 1000)
-        Log.i(tag, "Logitech receiver: leave DJ mode on interface ${hidpp.id} -> ${if (n >= 0) "ok" else "failed ($n)"}")
+        AppLog.i(tag, "Logitech receiver: leave DJ mode on interface ${hidpp.id} -> ${if (n >= 0) "ok" else "failed ($n)"}")
     }
 }

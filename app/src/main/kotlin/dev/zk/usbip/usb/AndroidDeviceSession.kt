@@ -1,5 +1,6 @@
 package dev.zk.usbip.usb
 
+import dev.zk.usbip.AppLog
 import android.hardware.usb.UsbConfiguration
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
@@ -102,7 +103,7 @@ class AndroidDeviceSession(
         val address = request.endpoint or (if (request.isIn) UsbConstants.USB_DIR_IN else UsbConstants.USB_DIR_OUT)
         val ep = endpoints[address]?.endpoint
         if (ep == null) {
-            Log.w(tag, "URB for unknown endpoint 0x${address.toString(16)}")
+            AppLog.w(tag, "URB for unknown endpoint 0x${address.toString(16)}")
             onComplete(UrbResult.error(Errno.ENOENT))
             return NO_CANCEL
         }
@@ -115,7 +116,7 @@ class AndroidDeviceSession(
 
     /** Called by the backend when Android reports the device was unplugged. */
     fun onDeviceDetached() {
-        Log.i(tag, "device detached")
+        AppLog.i(tag, "device detached")
         disconnectCallback?.invoke() ?: close()
     }
 
@@ -132,7 +133,7 @@ class AndroidDeviceSession(
             claimed.clear()
         }
         conn.close()
-        Log.i(tag, "session closed")
+        AppLog.i(tag, "session closed")
         onClosed()
     }
 
@@ -151,7 +152,7 @@ class AndroidDeviceSession(
         for (i in 0 until cfg.interfaceCount) {
             val itf = cfg.getInterface(i)
             if (itf.alternateSetting != 0) continue
-            if (conn.claimInterface(itf, true)) claimed += itf else Log.w(tag, "could not claim interface ${itf.id}")
+            if (conn.claimInterface(itf, true)) claimed += itf else AppLog.w(tag, "could not claim interface ${itf.id}")
             addEndpoints(itf)
         }
     }
@@ -170,7 +171,7 @@ class AndroidDeviceSession(
         claimed.forEach { conn.releaseInterface(it) }
         claimed.clear()
         val ok = conn.setConfiguration(target)
-        if (ok) config = target else Log.w(tag, "SET_CONFIGURATION $value failed")
+        if (ok) config = target else AppLog.w(tag, "SET_CONFIGURATION $value failed")
         claimConfiguration(config)
         if (ok) UrbResult(0, 0) else UrbResult.error(Errno.EPIPE)
     }
@@ -342,7 +343,7 @@ class AndroidDeviceSession(
             (r.clientData as? Transfer)?.onReaped(r) ?: r.close()
         }
         if (!closed) {
-            Log.w(tag, "reaper stopped; treating device as disconnected")
+            AppLog.w(tag, "reaper stopped; treating device as disconnected")
             onDeviceDetached()
         }
     }

@@ -1,10 +1,10 @@
 package dev.zk.usbip.usb
 
+import dev.zk.usbip.AppLog
 import android.content.Context
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbManager
-import android.util.Log
 import dev.zk.usbip.Prefs
 import dev.zk.usbip.protocol.DeviceNaming
 import dev.zk.usbip.protocol.ImportResult
@@ -90,7 +90,7 @@ class AndroidUsbBackend(context: Context, private val prefs: Prefs) : UsbIpBacke
         if (usb.hasPermission(d)) runCatching { d.serialNumber }.getOrNull()?.takeIf { it.isNotBlank() } else null
 
     override fun listDevices(): List<UsbIpDevice> = exportedDevices().mapNotNull {
-        runCatching { describe(it, null) }.onFailure { e -> Log.w(TAG, "describe ${it.deviceName}", e) }.getOrNull()
+        runCatching { describe(it, null) }.onFailure { e -> AppLog.w(TAG, "describe ${it.deviceName}", e) }.getOrNull()
     }
 
     override fun import(busId: String): ImportResult {
@@ -105,7 +105,7 @@ class AndroidUsbBackend(context: Context, private val prefs: Prefs) : UsbIpBacke
                     onSessionsChanged()
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "import $busId failed", e)
+                AppLog.e(TAG, "import $busId failed", e)
                 conn.close()
                 return ImportResult.Error(UsbIp.ST_DEV_ERR, e.message ?: "import failed")
             }
@@ -159,7 +159,7 @@ class AndroidUsbBackend(context: Context, private val prefs: Prefs) : UsbIpBacke
                     conn.controlTransfer(0x80, 0x06, 0x0600, 0, ByteArray(10), 10, 500) >= 10
                 desc?.guessSpeed(qualifier) ?: UsbSpeed.FULL
             }
-            Log.i(TAG, "${d.deviceName}: speed=$speed bcdUSB=${desc?.bcdUsb?.toString(16)}")
+            AppLog.i(TAG, "${d.deviceName}: speed=$speed bcdUSB=${desc?.bcdUsb?.toString(16)}")
             return DeviceFacts(speed, desc?.bcdDevice ?: parseBcd(d.version))
         } finally {
             if (existing == null) conn?.close()
